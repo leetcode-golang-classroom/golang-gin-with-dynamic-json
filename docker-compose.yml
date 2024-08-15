@@ -1,0 +1,56 @@
+services:
+  blog-api:
+    container_name: blog-api
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: release
+    image: blog-api
+    environment:
+      PORT: ${PORT}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ADDR: db:3306
+      GIN_MODE: release
+    ports:
+      - ${PORT}:${PORT}
+    networks:
+      - mysql
+    depends_on:
+      db:
+        condition: service_healthy
+    logging:
+      driver: json-file
+      options: 
+        max-size: 1k
+        max-file: 3
+  db: 
+    image: mysql:8
+    container_name: mysql
+    restart: always
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    ports:
+      - ${MYSQL_PORT}:${MYSQL_PORT}
+    volumes:
+      - ./data:/var/lib/mysql
+    logging:
+      driver: json-file
+      options: 
+        max-size: 1k
+        max-file: 3
+    networks:
+      - mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+networks:
+  mysql:
+    driver: bridge
+    name: mysql

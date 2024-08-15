@@ -1,0 +1,6 @@
+bin
+data
+README.md
+.env
+docker-compose.yml
+Dockerfile
