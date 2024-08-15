@@ -10,7 +10,12 @@ on:
 
 env:
   IMAGE_NAME: blog-api
-
+  MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE }}
+  MYSQL_USER: ${{ secrets.MYSQL_USER }}
+  MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
+  MYSQL_ADDR: ${{ secrets.MYSQL_ADDR }}
+  GIN_MODE: release
+  PORT: 8080
 jobs:
 
   push:
