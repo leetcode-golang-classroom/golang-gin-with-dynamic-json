@@ -62,3 +62,28 @@ func TestBlogIndex(t *testing.T) {
 	assert.Equal(t, result.Blogs[0].Title, blog2.Title)
 	assert.Equal(t, result.Blogs[0].Content, blog2.Content)
 }
+
+func TestBlogIndexWithEmptyTable(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	req := httptest.NewRequest(http.MethodGet, "/blogs?format=json", nil)
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	ctx.Request = req
+	models_test.TRdb.Db.Exec("DELETE * FROM blogs;")
+
+	store := blog.NewBlogStore(models_test.TRdb)
+	hdr := blog.NewHandler(store)
+	hdr.BlogIndex(ctx)
+
+	res := w.Result()
+	defer res.Body.Close()
+	// Check the status code
+	assert.Equal(t, res.StatusCode, http.StatusOK, "API should return 200 stauts code")
+
+	// Read data from the body and parse the JSON
+	var result Response
+	err := json.NewDecoder(res.Body).Decode(&result)
+	assert.NoError(t, err)
+	// Check the length of the blogs array
+	assert.Len(t, result.Blogs, 0)
+}
