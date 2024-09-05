@@ -2,9 +2,11 @@ package controller_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strconv"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -16,6 +18,7 @@ import (
 )
 
 func TestMain(m *testing.M) {
+	gin.SetMode(gin.TestMode)
 	// Setup the MySQL test database
 	models_test.SetupTestDB(config.AppConfig)
 	code := m.Run()
@@ -31,8 +34,11 @@ type Response struct {
 	TotalPages int          `json:"totalPages"`
 }
 
+type ShowResponse struct {
+	Blog model.Blog `json:"blog"`
+}
+
 func TestBlogIndex(t *testing.T) {
-	gin.SetMode(gin.TestMode)
 	req := httptest.NewRequest(http.MethodGet, "/blogs?format=json", nil)
 	w := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(w)
@@ -64,12 +70,11 @@ func TestBlogIndex(t *testing.T) {
 }
 
 func TestBlogIndexWithEmptyTable(t *testing.T) {
-	gin.SetMode(gin.TestMode)
 	req := httptest.NewRequest(http.MethodGet, "/blogs?format=json", nil)
 	w := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(w)
 	ctx.Request = req
-	models_test.TRdb.Db.Exec("DELETE * FROM blogs;")
+	models_test.TRdb.Db.Exec("DELETE FROM blogs;")
 
 	store := blog.NewBlogStore(models_test.TRdb)
 	hdr := blog.NewHandler(store)
@@ -86,4 +91,80 @@ func TestBlogIndexWithEmptyTable(t *testing.T) {
 	assert.NoError(t, err)
 	// Check the length of the blogs array
 	assert.Len(t, result.Blogs, 0)
+}
+
+func TestBlogShow(t *testing.T) {
+	// gin.SetMode(gin.TestMode)
+	// Seed the table
+	blogTest := model.Blog{Title: "Test Blog", Content: "This is a test blog content"}
+	models_test.TRdb.Db.Create(&blogTest)
+
+	store := blog.NewBlogStore(models_test.TRdb)
+	hdr := blog.NewHandler(store)
+	t.Run("Valid Blog ID", func(t *testing.T) {
+		blogID := strconv.FormatUint(uint64(blogTest.ID), 10)
+		req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/blogs/%s?format=json", blogID), nil)
+		w := httptest.NewRecorder()
+		ctx, _ := gin.CreateTestContext(w)
+		ctx.Request = req
+		ctx.Params = []gin.Param{
+			{
+				Key:   "id",
+				Value: blogID,
+			},
+		}
+
+		hdr.BlogShow(ctx)
+
+		res := w.Result()
+		defer res.Body.Close()
+		// Check the status code
+		assert.Equal(t, http.StatusOK, res.StatusCode)
+		//Read data from
+		var returnedBlog ShowResponse
+		err := json.NewDecoder(res.Body).Decode(&returnedBlog)
+		assert.NoError(t, err)
+
+		// // Check the returned blog match
+		assert.Equal(t, blogTest.Title, returnedBlog.Blog.Title)
+		assert.Equal(t, blogTest.Content, returnedBlog.Blog.Content)
+	})
+	t.Run("Invalid Blog ID", func(t *testing.T) {
+		blogID := "invalidID"
+		req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/blogs/%s?format=json", blogID), nil)
+		w := httptest.NewRecorder()
+		ctx, _ := gin.CreateTestContext(w)
+		ctx.Request = req
+		ctx.Params = []gin.Param{
+			{
+				Key:   "id",
+				Value: blogID,
+			},
+		}
+		hdr.BlogShow(ctx)
+
+		res := w.Result()
+		defer res.Body.Close()
+		// Check Response Status
+		assert.Equal(t, http.StatusBadRequest, res.StatusCode)
+	})
+	t.Run("Non-Existed Blog ID", func(t *testing.T) {
+		blogID := "99999"
+		req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/blogs/%s?format=json", blogID), nil)
+		w := httptest.NewRecorder()
+		ctx, _ := gin.CreateTestContext(w)
+		ctx.Request = req
+		ctx.Params = []gin.Param{
+			{
+				Key:   "id",
+				Value: blogID,
+			},
+		}
+		hdr.BlogShow(ctx)
+
+		res := w.Result()
+		defer res.Body.Close()
+		// Check Response Status
+		assert.Equal(t, http.StatusNotFound, res.StatusCode)
+	})
 }

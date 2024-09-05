@@ -27,6 +27,10 @@ func (handler *Handler) RegisterRoute(router *gin.RouterGroup) {
 func (handler *Handler) BlogIndex(ctx *gin.Context) {
 	blogs, err := handler.store.FindAll(ctx)
 	if err != nil {
+		if err.Error() == "record not found" {
+			util.WriteError(ctx.Writer, http.StatusNotFound, err)
+			return
+		}
 		util.WriteError(ctx.Writer, http.StatusInternalServerError, err)
 		return
 	}
@@ -60,6 +64,10 @@ func (handler *Handler) BlogShow(ctx *gin.Context) {
 	}
 	blog, err := handler.store.Find(ctx, id)
 	if err != nil {
+		if err.Error() == "record not found" {
+			util.WriteError(ctx.Writer, http.StatusNotFound, err)
+			return
+		}
 		util.WriteError(ctx.Writer, http.StatusInternalServerError, err)
 		return
 	}
